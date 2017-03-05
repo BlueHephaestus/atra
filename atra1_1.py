@@ -13,7 +13,9 @@ import numpy as np
 np.random.seed(420)#For ease of testing
 
 from keras.datasets import mnist
-from keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape
+#from keras.layers import Input, Dense, Activation, Flatten, Reshape, Merge
+from keras.layers import *
+from keras.models import Model
 from keras.optimizers import SGD, Adam
 from keras.utils import np_utils
 from keras import backend as K
@@ -92,7 +94,8 @@ for capsule_i in range(capsule_n):
 """
 We then pack our list into a tensor that we can manipulate further down our graph.
 """
-recognition_hidden_flattened_outputs = K.pack(recognition_hidden_flattened_outputs)
+recognition_hidden_flattened_outputs = merge([recognition_hidden_flattened_output for recognition_hidden_flattened_output in recognition_hidden_flattened_outputs], mode='concat')
+#recognition_hidden_flattened_outputs = K.pack(recognition_hidden_flattened_outputs)
 
 """
 We also reshape back into an image, now that we have put it through the Dense Layer
@@ -107,14 +110,24 @@ atomic_capsule_outputs = recognition_hidden_image_outputs
 """
 Assign our final output value(s) to the sum of our atomic_capsule_outputs values over the capsule axis, axis 0
 """
+"""
+FIGURING IT OUT HERE
+"""
 composite_capsule_output = K.sum(atomic_capsule_outputs, axis=0)
+#composite_capsule_output = merge([atomic_capsule_output for atomic_capsule_output in atomic_capsule_outputs], mode='sum')
+#composite_capsule_output = merge(atomic_capsule_outputs, mode='sum')
 
 """
-Initialize a session and get our outputs with some random inputs of shape (batch, input_dims[0], input_dims[1])
+With our inputs and outputs, create a Keras Model.
 """
+model = Model(input=inputs, output=composite_capsule_output)
+"""
+Initialize a session and get our outputs with some random inputs of shape (batch, input_dims[0], input_dims[1])
 sess = K.get_session()
 sample_inputs = np.ones((1,input_dims[0], input_dims[1], input_dims[2]))
 print sample_inputs
 a = sess.run(composite_capsule_output, feed_dict={inputs: sample_inputs})
 print a
 print a.shape
+"""
+
