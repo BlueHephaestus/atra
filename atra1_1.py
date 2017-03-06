@@ -13,10 +13,8 @@ import numpy as np
 np.random.seed(420)#For ease of testing
 
 from keras.datasets import mnist
-#from keras.layers import Input, Dense, Activation, Flatten, Reshape, Merge
 from keras.layers import *
 from keras.models import Model
-from keras.optimizers import SGD, Adam
 from keras.utils import np_utils
 from keras import backend as K
 
@@ -58,8 +56,12 @@ Define inputs,
 
 capsule_n = 2
 input_dims = [28,28]
-inputs = Input(shape=input_dims)
+flattened_output_dims = np.prod(input_dims)
+capsule_output_dims = [capsule_n]
+capsule_output_dims.extend(input_dims)
+flattened_capsule_output_dims = np.prod(capsule_output_dims)
 
+inputs = Input(shape=input_dims)
 """
 First off, each capsule's hidden units are independent from one another.
 This means we don't share the recognition units, so if we want to have n capsules easily,
@@ -68,76 +70,54 @@ So our first model is only going to be testing this.
 """
 
 """
-TEMPORARILY DEPRECATED
-Get the dimensions of our recognition hidden flattened dims via the # of capsules, and the flattened input dimensions.
-We also set the image dims in the same fashion, but without flattening our input_dims
-"""
-"""
-recognition_hidden_flattened_dims = [capsule_n, np.prod(input_dims)]
-recognition_hidden_image_dims = [capsule_n]
-recognition_hidden_image_dims.extend(input_dims)
-"""
-
-"""
-We don't have the capsule number included in our input dimensions, but it is an extra hyper parameter.
-However, since it affects the output shape, namely, NxHxW in this case, we have to manipulate our dimensions with it in mind.
-    So, we can't flatten normally. 
-    We have a Lambda layer here to reshape according to our recognition_hidden_flattened_dims, instead.
 When we put our inputs through the introductory recognition hidden layer in each of our capsules when defining our model, 
     we will be looping through each capsule and applying the same input to a different dense layer each time.
 Because we are putting the inputs, of shape (None, 28, 28) (where None = Mini batch size), 
     through these dense layers, we want to flatten our inputs first. So we do that here.
 """
-#flattened_inputs = Lambda(lambda inputs: K.reshape(inputs, [np.prod(input_dims)]))(inputs)
 flattened_inputs = Flatten()(inputs)
 
 """
 Initialize output of our recognition hidden layer as a list
 """
-recognition_hidden_flattened_outputs = []
+capsule_outputs = []
 
 """
 Then, thanks to Keras's functional model API, we can actually just loop through
     for each capsule, and apply an independent Dense Layer with activation function of our choice to the flattened inputs.
-NOTE: For now having the output be the same size as the input, but this needs to be smaller or else we defeat the purpose of an autoencoder.
-NOTE2: This is because i'm not sure how we are expected to move the encoded input back into a larger input at the end yet
+Since our model is more or less shaped like so:
+    ----Input----
+    / /   | ... \
+   C C    C ... C
+   | |    | ... |
+   y y    y ... y
+   \ \    | ... /
+    ----Output---
+We can represent our model by first copying our input into each capsule by creating a list of capsule outputs,
+    Then looping through this list each time we add a layer to our model,
+    Then finally merging the layers when we get our output.
 """
 for capsule_i in range(capsule_n):
-    recognition_hidden_flattened_outputs.append(Dense(28*28, activation="relu")(flattened_inputs))
+    capsule_outputs.append(Dense(3*3, activation="relu")(flattened_inputs))
 
 """
-We then merge all the elements in our list with mode concat so that we can manipulate them further down our graph.
+BEGIN DECODER
+Since this is a small example, we skip a lot of our decoder, 
+    and simply add on a new dense layer to each capsule for its output.
 """
-recognition_hidden_flattened_outputs = merge([recognition_hidden_flattened_output for recognition_hidden_flattened_output in recognition_hidden_flattened_outputs], mode='concat')
+for capsule_i in range(capsule_n):
+    capsule_outputs[capsule_i] = Dense(flattened_output_dims, activation="relu")(capsule_outputs[capsule_i])
+
 
 """
-We also reshape back into an image, now that we have put it through the Dense Layer
-Now that we have put the data through each capsule's dense layer, we have 
-    recognition_hidden_flattened_outputs as shape (None, capsule_n*#_of_dense_outputs).
-        Where None is the mini batch size, not included in our calculations but definitely warrants mentioning.
-We reshape this so that recognition_hidden_capsule_outputs becomes shape (None, capsule_n, #_of_dense_outputs),
-    And we get the last dimension via K.int_shape(recognition_hidden_flattened_outputs)[-1]//capsule_n, 
-        since according to my statement of the shape of recognition_hidden_flattened_outputs, this will return #_of_dense_outputs.
-With this, we have divided the outputs according to capsule, so that the output tensor is of shape (mini batch, capsule, outputs #)
+With the atomic capsule model complete, we merge all our outputs together to get the atomic_capsule_outputs, initially with concatenation.
 """
-#print K.int_shape(recognition_hidden_flattened_outputs)
-#print K.int_shape(recognition_hidden_flattened_outputs)[-1]//capsule_n
-recognition_hidden_capsule_outputs = Reshape([capsule_n, K.int_shape(recognition_hidden_flattened_outputs)[-1]//capsule_n])(recognition_hidden_flattened_outputs)
+atomic_capsule_outputs = merge([capsule_output for capsule_output in capsule_outputs], mode='concat')
 
 """
-TEMPORARY
-If we're only outputting the same size as the original from our dense layers, 
-    then we want to reshape these back into the image / matrix representations as they were originally given,
-    so that we can properly apply transformations.
-However, it should be noted that we could still apply transformations if they were reduced,
-    however the encodings would have to be reshapeable to images, e.g. 28x28 -> 11x11, 160x290 -> 80x145
+We then reshape so as to get the image outputs, of the same shape as our labels / inputs
 """
-recognition_hidden_image_outputs = Reshape([capsule_n, 28, 28])(recognition_hidden_capsule_outputs)
-
-"""
-For this small example, assign what should be a result later in our model to this now since we aren't including the entire model yet.
-"""
-atomic_capsule_outputs = recognition_hidden_image_outputs
+atomic_capsule_outputs = Reshape(capsule_output_dims)(atomic_capsule_outputs)
 
 """
 Note: The dimensions / axes are (Mini batches, Capsules, ...)
@@ -163,6 +143,6 @@ print a
 print a.shape
 """
 model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
-results = model.fit(X_train[:100], X_train[:100], nb_epoch=80, batch_size=4, shuffle=True)
+results = model.fit(X_train, X_train, nb_epoch=80, batch_size=50, shuffle=True)
 print results.history["loss"]
 print results.history["acc"]
