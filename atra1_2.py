@@ -10,6 +10,8 @@ MK1.2 will likely be finished when I have finished adding in all the basic eleme
 Features Added
     Display of sample autoencoder outputs
     Graphing of results
+    Display of individual capsule outputs per sample
+    Visual Entity Probabilities & Gating units
 
 -Blake Edwards / Dark Element
 """
