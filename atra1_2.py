@@ -7,13 +7,22 @@ I realized there was a lot I could do much easier using Keras' functional API,
 MK1.2 will likely be finished when I have finished adding in all the basic elements of the transforming autoencoder,
     but not yet added in many intricacies or optimizations.
 
+Features Added
+    Display of sample autoencoder outputs
+    Graphing of results
+
 -Blake Edwards / Dark Element
 """
+import sys
 import numpy as np
 np.random.seed(420)#For ease of testing
 
+import atra_base
+from atra_base import *
+
 from keras.datasets import mnist
 from keras.layers import *
+from keras.regularizers import l2
 from keras.models import Model
 from keras.utils import np_utils
 from keras import backend as K
@@ -54,9 +63,14 @@ Define inputs,
         Of course, we can easily manipulate the input dimensions to have (784,) or (28,28) or (784, 1, 1) or (28, 28, 1), and so on.
 """
 
-capsule_n = 2
+capsule_n = 3
+dropout_p = 0.0
+regularization_rate = 0.00
+encoder_output_dim = [3,3]
 input_dims = [28,28]
+
 flattened_output_dims = np.prod(input_dims)
+flattened_encoder_output_dim = np.prod(encoder_output_dim)
 capsule_output_dims = [capsule_n]
 capsule_output_dims.extend(input_dims)
 flattened_capsule_output_dims = np.prod(capsule_output_dims)
@@ -95,18 +109,30 @@ Since our model is more or less shaped like so:
     ----Output---
 We can represent our model by first copying our input into each capsule by creating a list of capsule outputs,
     Then looping through this list each time we add a layer to our model,
-    Then finally merging the layers when we get our output.
+    Then finally merging the layers when we get our output at the end.
 """
 for capsule_i in range(capsule_n):
-    capsule_outputs.append(Dense(3*3, activation="relu")(flattened_inputs))
+    capsule_outputs.append(Dense(flattened_encoder_output_dim, activation="relu", W_regularizer=l2(regularization_rate))(flattened_inputs))
+    capsule_outputs[capsule_i] = Dropout(dropout_p)(capsule_outputs[capsule_i])
+
+"""
+Invariant Visual Entity Probabilities
+    Each capsule learns to represent it's own visual entity, equivariantly. 
+    However, it also needs a way to represent when it's visual entity is more or less present, in an invariant fashion. We do this with a simple 0-1 probability.
+    Since each capsule has one scalar for the probability, we can easily just loop through and assign just as we did with the dense outputs.
+    Our formula for each probability is just a normal dense layer, with the output as one.
+"""
+capsule_entity_probabilities = []
+for capsule_i in range(capsule_n):
+    capsule_entity_probabilities.append(Dense(1, activation="relu", W_regularizer=l2(regularization_rate))(capsule_outputs[capsule_i]))
 
 """
 BEGIN DECODER
-Since this is a small example, we skip a lot of our decoder, 
-    and simply add on a new dense layer to each capsule for its output.
+Currently, just one layer of generation units
 """
 for capsule_i in range(capsule_n):
-    capsule_outputs[capsule_i] = Dense(flattened_output_dims, activation="relu")(capsule_outputs[capsule_i])
+    capsule_outputs[capsule_i] = Dense(flattened_output_dims, activation="relu", W_regularizer=l2(regularization_rate))(capsule_outputs[capsule_i])
+    capsule_outputs[capsule_i] = Dropout(dropout_p)(capsule_outputs[capsule_i])
 
 
 """
@@ -142,7 +168,32 @@ a = sess.run(composite_capsule_output, feed_dict={inputs: sample_inputs})
 print a
 print a.shape
 """
-model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
-results = model.fit(X_train, X_train, nb_epoch=80, batch_size=50, shuffle=True)
-print results.history["loss"]
-print results.history["acc"]
+"""
+Train the model and get results
+"""
+model.compile(loss="categorical_crossentropy", optimizer="adadelta", metrics=["accuracy"])
+results = model.fit(X_train, X_train, nb_epoch=20, batch_size=50, shuffle=True)
+
+"""
+Get sample inputs and outputs
+"""
+display_test_n = 16
+sample_inputs = X_test[:display_test_n]
+sample_outputs = model.predict(sample_inputs)
+
+"""
+Concatenate each into their own row
+"""
+sample_inputs = get_concatenated_row(sample_inputs)
+sample_outputs = get_concatenated_row(sample_outputs)
+
+"""
+Get a comparison image by concatenating the rows on top of each other, then display
+"""
+comparison_img = get_concatenated_col((sample_inputs, sample_outputs))
+disp_img_fullscreen(comparison_img)
+
+"""
+Graph our loss and accuracy
+"""
+graph_results(results.history["loss"], results.history["acc"])
