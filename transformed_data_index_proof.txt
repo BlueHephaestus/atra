@@ -1,0 +1,37 @@
+Given:
+  i, a natural number >= 0 for our original index in our original data array
+  n, a natural number > 0 for the # of transformation matrices for each sample in our original data array
+  n_i, a natural number >= 0 for the transformation index in our transformation matrices
+
+Prove that j = i * n + n_i always returns the desired index in our transformed_data array.
+
+We can think of our transformed_data array as a vector, where each element is a modified version of an element in our original data array.
+We can also think of our data array as a matrix, where each row is a sample, and each column is a different modified version of that sample.
+
+With this representation:
+
+  Our matrix is of size nxm, where n is irrelevant in this proof.
+  Our vector is of size n*m, where n is irrelevant in this proof.
+
+  i = i, the row index in our matrix. 
+  n = m, the width of our matrix / number of columns.
+  n_i = j, the column index in our matrix.
+  j = r, the index in our vector.
+
+  We already know the following:
+    For a given matrix of size nxm and given indices (i, j) in this matrix, the index in the resulting flattened matrix will be:
+      r = i * m + j
+
+  So, substituting in our values, we get
+    
+      j = i * n + n_i
+
+  So by bijection, we have our formula to get the index of any sample in our transformed data matrix given the number of transformation matrices, the index in the original data array, and the index in the transformation matrices.
+
+  We can further derive that if we know j, and n, we can loop through n_i and get
+    
+      i = (j - n_i)//n, since i must be a natural number.
+
+  This last formula isn't really useful for the program I just wanted to do it.
+
+  Q.E.D.  - DE
