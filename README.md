@@ -1,8 +1,8 @@
-#Description 
+# Description 
 
 The majority of the explanation behind this method and project will be posted in a series on my blog [here](https://dark-element.com/), when I make it. For now, I am still figuring out the intricacies of the method, and the project will be divided into a Mark system. I wrote this in Keras, with tendency towards the Tensorflow backend.
 
-##MK 1.1 - Initial Model
+## MK 1.1 - Initial Model
 
 Test model, makes use of the Keras functional model API to have variable number of capsules for given inputs, apply a dense layer (output of each = activation(weight * input + bias)) to the input for each capsule, get all the outputs in one tensor, and then sum those outputs together into a final output.
 
@@ -22,7 +22,7 @@ In summary, the features are:
   4. One ReLU layer for Generation Hidden Units
   5. Sum over all capsule's output for final output
 
-##MK 1.2 - Barebones main components
+## MK 1.2 - Barebones main components
 
 Building from MK 1.1's features, we added
   
@@ -33,7 +33,7 @@ Building from MK 1.1's features, we added
   5. Display of individual capsule outputs per sample
   6. Visual Entity Probabilities & Gating units
 
-##MK 1.3 - Application of Transformations
+## MK 1.3 - Application of Transformations
 
 Building from MK 1.2's features, this version will be all about implementing transformations.
 
